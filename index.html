@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Kuis Sekolah - Putzz (GitHub Connected)</title>
+<style>
+:root{--bg:#f6f7fb;--card:#fff;--accent:#2563eb}
+body{font-family:Inter, "Segoe UI", Roboto, sans-serif;background:var(--bg);margin:0;padding:20px;color:#111}
+.wrap{max-width:900px;margin:20px auto}
+header{display:flex;gap:12px;align-items:center}
+h1{margin:0;font-size:1.4rem}
+.card{background:var(--card);padding:18px;border-radius:12px;box-shadow:0 6px 18px rgba(10,10,10,0.06);margin-top:14px}
+label{display:block;margin-bottom:6px;font-weight:600}
+input[type="text"], input[type="password"]{width:100%;padding:10px;border-radius:8px;border:1px solid #ddd}
+.q{margin:12px 0;padding:12px;border-radius:10px;border:1px solid #eee}
+.opts{display:flex;flex-wrap:wrap;gap:8px}
+.opt{flex:1 1 calc(50% - 8px);background:#fafafa;padding:10px;border-radius:8px;border:1px solid #eee}
+button{background:var(--accent);color:#fff;border:none;padding:10px 14px;border-radius:10px;cursor:pointer}
+.muted{color:#666;font-size:0.9rem}
+.small{font-size:0.9rem}
+table{width:100%;border-collapse:collapse;margin-top:8px}
+th,td{padding:8px;border-bottom:1px solid #eee;text-align:left}
+.center{text-align:center}
+.note{background:#fff7e6;padding:10px;border-radius:8px;border:1px solid #ffe4b5}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header><h1>Kuis Sekolah — GitHub Connected</h1></header>
+
+    <div class="card">
+      <h3>Konfigurasi GitHub (opsional namun diperlukan untuk menyimpan leaderboard di repo GitHub)</h3>
+      <p class="muted">Jika ingin leaderboard global yang tersimpan di GitHub, isi detail repo dan token personal access token (PAT). Token perlu memiliki scope <code>repo</code> (untuk repo privat) atau <code>public_repo</code> untuk publik. <strong>Jangan bagikan token ke orang lain.</strong></p>
+      <label>Owner (username GitHub)</label>
+      <input id="ghOwner" type="text" placeholder="misal: PutzzXD12" />
+      <label>Nama repo</label>
+      <input id="ghRepo" type="text" placeholder="misal: Putzz-Database" />
+      <label>Path file JSON di repo</label>
+      <input id="ghPath" type="text" placeholder="misal: kuis/data_nilai.json" value="data_nilai.json" />
+      <label>Personal Access Token (PAT)</label>
+      <input id="ghToken" type="password" placeholder="Masukkan token GitHub (rahasia)" />
+      <p class="muted small">Catatan: kamu bisa juga kosongkan semua dan tetap menyimpan lokal (LocalStorage) saja.</p>
+      <div style="margin-top:10px"><button id="saveConfig">Simpan Konfigurasi</button></div>
+    </div>
+
+    <div class="card" id="startCard">
+      <label for="playerName">Masukkan nama kamu</label>
+      <input id="playerName" type="text" placeholder="Nama kamu..." />
+      <p class="muted">Semua soal tampil di satu halaman. Pilih jawaban untuk setiap soal lalu klik "Kirim Jawaban".</p>
+      <div style="margin-top:12px"><button id="startBtn">Mulai</button></div>
+    </div>
+
+    <form id="quizForm" class="card" style="display:none">
+      <div id="questionsArea"></div>
+      <div style="margin-top:12px" class="flex">
+        <button type="button" id="submitBtn">Kirim Jawaban</button>
+        <div style="flex:1"></div>
+        <button type="button" id="clearBtn" style="background:#ef4444">Hapus Leaderboard Lokal</button>
+      </div>
+    </form>
+
+    <div class="card" id="resultCard" style="display:none">
+      <h3>Hasil</h3>
+      <div id="resultText"></div>
+      <div id="syncInfo" class="muted small"></div>
+    </div>
+
+    <div class="card" id="leaderboardCard" style="display:none">
+      <h3>Leaderboard (Semua pemain)</h3>
+      <table id="leaderboardTable"><thead><tr><th>Rank</th><th>Nama</th><th>Skor</th><th>Tanggal</th></tr></thead><tbody></tbody></table>
+    </div>
+
+    <div style="height:40px;"></div>
+    <footer class="muted center">Versi GitHub-connected: akan mengirim data ke file JSON di repo yang kamu tentukan. Jika token dikosongkan, tetap memakai LocalStorage.</footer>
+  </div>
+
+<script>
+// Questions (same 20)
+const questions = [
+  { q: "1. Apa yang terjadi pada air saat dipanaskan hingga mendidih?", a:["Mengkristal","Menguap menjadi uap","Mencair","Mengeras"], correct:1 },
+  { q: "2. Organ pada tumbuhan yang menyerap air dan mineral dari tanah adalah...", a:["Daun","Akar","Batang","Bunga"], correct:1 },
+  { q: "3. Gaya yang membuat benda tertarik ke pusat bumi disebut...", a:["Gaya gesek","Gaya magnet","Gaya gravitasi","Gaya sentrifugal"], correct:2 },
+  { q: "4. Sinonim kata 'cepat' adalah...", a:["Lambat","Kencang","Malas","Rapat"], correct:1 },
+  { q: "5. Antonim kata 'subur' adalah...", a:["Miskin","Gersang","Luas","Nyaman"], correct:1 },
+  { q: "6. Apa singkatan HTML?", a:["HyperText Markup Language","HighText Machine Language","Hyperloop Text Model","Home Tool Markup"], correct:0 },
+  { q: "7. Algoritma adalah...", a:["Bahasa pemrograman","Urutan langkah penyelesaian masalah","Aplikasi smartphone","Database"], correct:1 },
+  { q: "8. Perintah untuk menampilkan teks di JavaScript adalah...", a:["console.log()", "print()", "echo()", "show()"], correct:0 },
+  { q: "9. Reaksi kimia yang menyerap panas disebut...", a:["Eksotermik","Endotermik","Netral","Foto-sintesis"], correct:1 },
+  { q: "10. Alat untuk mengukur massa benda adalah...", a:["Termometer","Jangka Sorong","Neraca","Barometer"], correct:2 },
+  { q: "11. Kata baku dari 'gak' adalah...", a:["Tidak","Gak","Ngga","Tak"], correct:0 },
+  { q: "12. Majas yang membandingkan dua hal tanpa kata 'seperti' disebut...", a:["Simile","Metafora","Personifikasi","Hiperbola"], correct:1 },
+  { q: "13. Perintah HTML untuk membuat tautan adalah tag...", a:["<img>","<a>","<p>","<div>"], correct:1 },
+  { q: "14. Dalam pemrograman, 'loop' digunakan untuk...", a:["Mengulang aksi berkali-kali","Menyimpan data","Menampilkan gambar","Menghubungkan database"], correct:0 },
+  { q: "15. Fotosintesis terjadi di bagian sel tumbuhan yang mengandung...", a:["Mitokondria","Klorofil","Kutu daun","Vakuola"], correct:1 },
+  { q: "16. Kalimat efektif memiliki ciri...", a:["Panji-panji","Panjang dan rumit","Jelas dan singkat","Berkali-kali"], correct:2 },
+  { q: "17. Tipe data yang menyimpan nilai benar/salah disebut...", a:["String","Integer","Boolean","Array"], correct:2 },
+  { q: "18. Bahasa pemrograman yang sering dipakai untuk halaman web adalah...", a:["Python","JavaScript","C++","Rust"], correct:1 },
+  { q: "19. Proses berubahnya gas menjadi cair disebut...", a:["Evaporasi","Kondensasi","Sublimasi","Presipitasi"], correct:1 },
+  { q: "20. Kata tanya untuk menanyakan tempat adalah...", a:["Mengapa","Kapan","Di mana","Bagaimana"], correct:2 }
+];
+
+const startCard = document.getElementById('startCard');
+const quizForm = document.getElementById('quizForm');
+const questionsArea = document.getElementById('questionsArea');
+const startBtn = document.getElementById('startBtn');
+const submitBtn = document.getElementById('submitBtn');
+const resultCard = document.getElementById('resultCard');
+const resultText = document.getElementById('resultText');
+const leaderboardCard = document.getElementById('leaderboardCard');
+const leaderboardTable = document.querySelector('#leaderboardTable tbody');
+const clearBtn = document.getElementById('clearBtn');
+const syncInfo = document.getElementById('syncInfo');
+
+let playerName = "";
+let ghConfig = loadGhConfig();
+
+function buildQuestions(){
+  let html = "";
+  questions.forEach((item, idx)=>{
+    html += `<div class="q">
+      <div><strong>${item.q}</strong></div>
+      <div class="opts">`;
+    item.a.forEach((opt, i)=>{
+      const id = `q${idx}_opt${i}`;
+      html += `<label class="opt"><input type="radio" name="q${idx}" id="${id}" value="${i}"> ${String.fromCharCode(65+i)}. ${opt}</label>`;
+    });
+    html += `</div></div>`;
+  });
+  questionsArea.innerHTML = html;
+}
+
+function escapeHtml(s){ if(!s) return ''; return s.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;'); }
+
+startBtn.addEventListener('click', ()=>{
+  const input = document.getElementById('playerName');
+  const name = input.value.trim();
+  if(name === ""){ alert('Tolong isi nama dulu.'); input.focus(); return; }
+  playerName = name;
+  startCard.style.display = 'none';
+  quizForm.style.display = 'block';
+  buildQuestions();
+  showLeaderboard();
+});
+
+document.getElementById('saveConfig').addEventListener('click', ()=>{
+  const owner = document.getElementById('ghOwner').value.trim();
+  const repo = document.getElementById('ghRepo').value.trim();
+  const path = document.getElementById('ghPath').value.trim() || 'data_nilai.json';
+  const token = document.getElementById('ghToken').value.trim();
+  const obj = {owner, repo, path, token: token ? '***hidden***' : ''};
+  // Save config except token in localStorage; token kept only in sessionStorage if provided
+  localStorage.setItem('ghConfigPublic', JSON.stringify({owner, repo, path}));
+  if(token) sessionStorage.setItem('ghToken', token);
+  alert('Konfigurasi disimpan. Jika memasukkan token, token disimpan hanya sementara di sesi browser ini.');
+  ghConfig = loadGhConfig();
+  showLeaderboard();
+});
+
+function loadGhConfig(){
+  const pub = JSON.parse(localStorage.getItem('ghConfigPublic')||'{}');
+  const token = sessionStorage.getItem('ghToken') || '';
+  return { owner: pub.owner||'', repo: pub.repo||'', path: pub.path||'data_nilai.json', token };
+}
+
+function getLocalDB(){
+  try{ return JSON.parse(localStorage.getItem('quizDB')||'[]'); }catch(e){return [];}
+}
+
+function setLocalDB(db){
+  localStorage.setItem('quizDB', JSON.stringify(db));
+}
+
+function showLeaderboard(){
+  // Merge local DB and remote DB (remote overrides nothing; we'll fetch remote if configured)
+  const local = getLocalDB();
+  // fetch remote if configured
+  leaderboardTable.innerHTML = '';
+  if(ghConfig.owner && ghConfig.repo && ghConfig.token){
+    syncInfo.textContent = 'Mencoba ambil leaderboard dari GitHub...';
+    fetchRemoteDB().then(remote => {
+      const merged = mergeDBs(remote, local);
+      renderLeaderboard(merged);
+      syncInfo.textContent = '';
+    }).catch(err=>{
+      // fallback to local only
+      renderLeaderboard(local);
+      syncInfo.textContent = 'Gagal ambil dari GitHub: '+err.message;
+    });
+  } else {
+    renderLeaderboard(local);
+  }
+}
+
+function mergeDBs(remote, local){
+  // simple concat and sort. keep all entries.
+  const combined = (remote||[]).concat(local||[]);
+  combined.sort((a,b)=> (b.score - a.score) || (new Date(b.date) - new Date(a.date)));
+  return combined;
+}
+
+function renderLeaderboard(db){
+  if(!db || db.length===0){ leaderboardCard.style.display='none'; return; }
+  leaderboardTable.innerHTML='';
+  db.forEach((row,i)=>{
+    const d = new Date(row.date);
+    leaderboardTable.innerHTML += `<tr><td>${i+1}</td><td>${escapeHtml(row.name)}</td><td>${row.score}/${questions.length}</td><td>${d.toLocaleString()}</td></tr>`;
+  });
+  leaderboardCard.style.display='block';
+}
+
+async function fetchRemoteDB(){
+  // Use GitHub API to get file contents
+  const {owner, repo, path, token} = ghConfig;
+  const url = `https://api.github.com/repos/${owner}/${repo}/contents/${path}`;
+  const resp = await fetch(url, { headers: { Authorization: 'token '+token, Accept: 'application/vnd.github.v3.raw' } });
+  if(!resp.ok) throw new Error('HTTP '+resp.status+' '+resp.statusText);
+  const text = await resp.text();
+  try{ return JSON.parse(text); }catch(e){ return []; }
+}
+
+submitBtn.addEventListener('click', async ()=>{
+  let score = 0;
+  for(let i=0;i<questions.length;i++){
+    const elems = document.getElementsByName('q'+i);
+    let chosen = null;
+    for(const e of elems){ if(e.checked){ chosen = parseInt(e.value); break; } }
+    if(chosen === questions[i].correct) score++;
+  }
+  const entry = { name: playerName, score, date: new Date().toISOString() };
+  // save local copy
+  const local = getLocalDB();
+  local.push(entry);
+  setLocalDB(local);
+  resultText.innerHTML = `<p>Hai <strong>${escapeHtml(playerName)}</strong>, skor kamu <strong>${score}/${questions.length}</strong>.</p>`;
+  resultCard.style.display = 'block';
+  // if github configured with token, try to push to GitHub file
+  ghConfig = loadGhConfig();
+  if(ghConfig.owner && ghConfig.repo && ghConfig.token){
+    syncInfo.textContent = 'Mengirim hasil ke GitHub...';
+    try{
+      await pushToGithub(entry);
+      syncInfo.textContent = 'Tersimpan di GitHub.';
+    }catch(err){
+      syncInfo.textContent = 'Gagal simpan ke GitHub: '+err.message;
+    }
+  }
+  showLeaderboard();
+  resultCard.scrollIntoView({behavior:'smooth'});
+});
+
+async function pushToGithub(entry){
+  // Steps:
+  // 1) GET file to obtain sha and current content
+  // 2) append entry and PUT updated content (base64) with message
+  const {owner, repo, path, token} = ghConfig;
+  const url = `https://api.github.com/repos/${owner}/${repo}/contents/${path}`;
+  const headers = { Authorization: 'token '+token, Accept: 'application/vnd.github.v3+json' };
+
+  // get current content (may 404 if not exists)
+  let current = [];
+  let sha = null;
+  const getResp = await fetch(url, { headers });
+  if(getResp.ok){
+    const json = await getResp.json();
+    // content is base64
+    const content = atob(json.content.replace(/\n/g,''));
+    try{ current = JSON.parse(content); }catch(e){ current = []; }
+    sha = json.sha;
+  } else if(getResp.status === 404){
+    current = [];
+    sha = null;
+  } else {
+    throw new Error('Gagal ambil file: '+getResp.status);
+  }
+
+  // append entry
+  current.push(entry);
+  // prepare payload
+  const updated = JSON.stringify(current, null, 2);
+  const b64 = btoa(unescape(encodeURIComponent(updated)));
+  const payload = { message: `Add score: ${entry.name} ${entry.score}`, content: b64 };
+  if(sha) payload.sha = sha;
+
+  const putResp = await fetch(url, { method: 'PUT', headers: {...headers, 'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+  if(!putResp.ok){
+    const txt = await putResp.text();
+    throw new Error('Gagal PUT ke GitHub: '+putResp.status+' '+txt.slice(0,200));
+  }
+  return true;
+}
+
+clearBtn.addEventListener('click', ()=>{
+  if(!confirm('Hapus semua data leaderboard lokal pada browser ini?')) return;
+  localStorage.removeItem('quizDB');
+  showLeaderboard();
+});
+
+// on load: restore public gh config if any
+(function init(){
+  const pub = JSON.parse(localStorage.getItem('ghConfigPublic')||'{}');
+  if(pub.owner) document.getElementById('ghOwner').value = pub.owner;
+  if(pub.repo) document.getElementById('ghRepo').value = pub.repo;
+  if(pub.path) document.getElementById('ghPath').value = pub.path;
+  // token intentionally not shown (keamanan)
+  ghConfig = loadGhConfig();
+  showLeaderboard();
+})();
+
+</script>
+</body>
+</html>
