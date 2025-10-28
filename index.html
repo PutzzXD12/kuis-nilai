@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Kuis IPS, IPA, dan Informatika - Putzz V4</title>
+<style>
+  body { font-family: 'Poppins', sans-serif; background: linear-gradient(120deg,#3a7bd5,#00d2ff); color:#333; margin:0; padding:0; }
+  .container { max-width:900px; margin:40px auto; background:white; border-radius:20px; padding:30px; box-shadow:0 10px 25px rgba(0,0,0,0.2); }
+  h1 { text-align:center; color:#0078ff; }
+  input[type="text"] { width:100%; padding:10px; margin-bottom:25px; border:2px solid #0078ff; border-radius:10px; font-size:16px; }
+  .question { margin-bottom:20px; }
+  .question h3 { color:#444; }
+  label { display:block; margin:8px 0; padding:8px; background:#f2f8ff; border-radius:10px; transition:0.3s; cursor:pointer; }
+  label:hover { background:#d9ebff; }
+  .btn { background:#0078ff; color:white; border:none; padding:12px 25px; border-radius:10px; font-size:16px; cursor:pointer; transition:0.3s; margin:10px auto; display:block; }
+  .btn:hover { background:#005dc1; }
+  .btn-danger { background:#ff4444; }
+  .btn-danger:hover { background:#d63030; }
+  #result { text-align:center; margin-top:20px; font-weight:bold; font-size:20px; }
+  #history { margin-top:30px; background:#f5f9ff; padding:15px; border-radius:15px; }
+  #history h3 { color:#0078ff; margin-bottom:10px; text-align:center; }
+  ul { list-style:none; padding:0; }
+  li { padding:6px 0; border-bottom:1px solid #ddd; text-align:center; }
+  .small-note { text-align:center; font-size:13px; color:#666; margin-top:6px; }
+  .loading-box { text-align:center; padding:10px; color:#0078ff; font-weight:bold; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <h1>Kuis IPS, IPA, dan Informatika - by gw Putzz V4 🔒</h1>
+
+  <input type="text" id="studentName" placeholder="Masukkan nama kamu...">
+
+  <form id="quizForm"></form>
+
+  <button type="button" class="btn" onclick="submitQuiz()">Selesai</button>
+  <button type="button" class="btn btn-danger" onclick="resetProtected()">Reset Data (Butuh Password)</button>
+  <div class="small-note">🔐 Password diambil langsung dari DATABASE GitHub.</div>
+
+  <div id="result"></div>
+
+  <div id="history">
+    <h3>📋 Daftar Nilai Peserta</h3>
+    <ul id="scoreList"></ul>
+  </div>
+</div>
+
+<script>
+/* ====== KONFIGURASI ====== */
+// GANTI LINK DI BAWAH DENGAN RAW LINK PUNYAMU SENDIRI
+const RAW_PW_URL = "https://raw.githubusercontent.com/PutzzXD12/kuis-nilai/refs/heads/main/pw_reset.json";
+
+/* ====== SOAL ====== */
+const quizData = [
+  {q:"1. Planet yang paling dekat dengan Matahari adalah ...",o:["Venus","Merkurius","Mars","Bumi"],a:1},
+  {q:"2. Fungsi akar pada tumbuhan adalah ...",o:["Menyerap air dan mineral","Tempat fotosintesis","Tempat menyimpan udara","Membentuk bunga"],a:0},
+  {q:"3. Gaya yang menyebabkan benda jatuh ke bawah disebut ...",o:["Gaya otot","Gaya gravitasi","Gaya magnet","Gaya listrik"],a:1},
+  {q:"4. Perubahan wujud dari gas menjadi cair disebut ...",o:["Menyublim","Mengkristal","Mengembun","Menguap"],a:2},
+  {q:"5. Zat yang tidak dapat diuraikan lagi menjadi zat lain disebut ...",o:["Senyawa","Unsur","Campuran","Larutan"],a:1}
+];
+
+/* ====== RENDER SOAL ====== */
+const form = document.getElementById("quizForm");
+quizData.forEach((item,i)=>{
+  const div=document.createElement("div");
+  div.classList.add("question");
+  div.innerHTML=`<h3>${item.q}</h3>`+
+  item.o.map((opt,idx)=>`
+    <label><input type="radio" name="q${i}" value="${idx}">${opt}</label>`).join("");
+  form.appendChild(div);
+});
+
+/* ====== SUBMIT KUIS ====== */
+function submitQuiz(){
+  const name=document.getElementById("studentName").value.trim();
+  if(!name){alert("Masukkan nama terlebih dahulu!");return;}
+  let score=0;
+  quizData.forEach((item,i)=>{
+    const selected=document.querySelector(`input[name='q${i}']:checked`);
+    if(selected && Number(selected.value)===item.a) score++;
+  });
+
+  let results = JSON.parse(localStorage.getItem("quiz_results")) || [];
+  results.push({ name, score });
+  localStorage.setItem("quiz_results", JSON.stringify(results));
+
+  document.querySelectorAll("input[type='radio']").forEach(r => r.checked = false);
+
+  document.getElementById("result").innerHTML=
+  `Nama: <b>${name}</b><br>Nilai: <b>${score}/${quizData.length}</b> (${Math.round(score/quizData.length*100)}%)`;
+  alert("✅ Kuis selesai! Nilai kamu tersimpan.");
+  tampilkanDaftarNilai();
+}
+
+/* ====== RESET DENGAN DATABASE GITHUB ====== */
+async function resetProtected(){
+  const attempt = prompt("Masukkan password untuk reset data:");
+  if (attempt === null) return;
+
+  document.getElementById("result").innerHTML = `<div class='loading-box'>⏳ Mengambil token dari DATABASE GitHub...</div>`;
+
+  try {
+    const res = await fetch(RAW_PW_URL + "?_=" + Date.now(), { cache: "no-store" });
+    if (!res.ok) throw new Error("Gagal mengakses GitHub.");
+    const data = await res.json();
+    const validPassword = data.reset_password;
+
+    await new Promise(resolve => setTimeout(resolve, 1500)); // efek loading
+
+    if (attempt.trim() === validPassword) {
+      alert("✅ [DATABASE] Token valid — akses diizinkan!");
+      localStorage.removeItem("quiz_results");
+      tampilkanDaftarNilai();
+      document.getElementById("result").innerHTML = "🧹 Semua data nilai berhasil dihapus dari sistem.";
+      document.getElementById("studentName").value = "";
+    } else {
+      alert("❌ [DATABASE] Token salah — akses ditolak!");
+      document.getElementById("result").innerHTML = "🔒 Autentikasi gagal ke DATABASE GitHub.";
+    }
+
+  } catch (err) {
+    alert("⚠️ Tidak bisa mengakses DATABASE GitHub!");
+    document.getElementById("result").innerHTML = "🚫 Terjadi kesalahan koneksi ke GitHub.";
+  }
+}
+
+/* ====== TAMPILKAN DAFTAR NILAI ====== */
+function tampilkanDaftarNilai(){
+  const list=document.getElementById("scoreList");
+  list.innerHTML="";
+  let results = JSON.parse(localStorage.getItem("quiz_results")) || [];
+  if(results.length===0){
+    list.innerHTML="<li>Belum ada peserta yang mengerjakan.</li>";
+    return;
+  }
+  results.forEach((r,i)=>{
+    list.innerHTML+=`<li>${i+1}. ${r.name} — ${r.score}/${quizData.length} (${Math.round(r.score/quizData.length*100)}%)</li>`;
+  });
+}
+tampilkanDaftarNilai();
+</script>
+</body>
+</html>
